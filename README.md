@@ -35,3 +35,15 @@ Node 22+, sans dépendance. `npm start` lance http://127.0.0.1:3000 ; `npm test`
 `python -m unittest discover -s test -p 'test_*.py'`
 
 Les tests utilisent des réponses simulées et n’envoient pas d’e-mails. Pour lancer le site : `pip install -r requirements.txt` puis `streamlit run streamlit_app.py`.
+
+
+## Ateliers interactifs
+
+- T-shirt : texte séparé face/dos, couleur du vêtement simulée, couleur et police du marquage, placement et taille. Le textile n’est pas fourni : le client apporte son vêtement et sa compatibilité doit être validée.
+- Tube : jusqu’à trois textes et une photo JPG/PNG/WebP (5 Mo maximum), fond, glisser-déposer, poignées de redimensionnement et rotation, alignement, clavier, recadrage et ordre des éléments. Les éléments restent dans la zone de sécurité.
+- Les images sont traitées localement par Canvas, redimensionnées à 1 200 pixels maximum et réencodées sans métadonnées. Aucun fichier utilisateur n’est envoyé pendant l’édition ni conservé dans le stockage du navigateur.
+- « Ajouter à ma demande » fige un aperçu et un descriptif. Répéter cette action pour actualiser une création modifiée. Une création t-shirt et une création tube peuvent être jointes ; elles sont conservées après un échec d’envoi.
+- L’envoi comporte jusqu’à trois JPEG (aperçu du t-shirt, aperçu du tube, photo du tube redimensionnée), contrôlés côté serveur et transmis à FormSubmit en multipart. Le plafond est inférieur aux 10 Mo indiqués par FormSubmit. Les aperçus peuvent aussi être téléchargés avant envoi.
+- Le rendu est indicatif : le cylindre est une projection visuelle et les dimensions ne sont pas des cotes de fabrication. Le fichier original de la photo et une validation finale peuvent être nécessaires.
+
+La réception réelle des messages et pièces jointes exige toujours l’activation FormSubmit. Le dernier essai en production avant l’ajout des ateliers avait été refusé par le service d’envoi ; les tests automatisés utilisent des réponses simulées et ne prouvent pas la livraison en boîte de réception.

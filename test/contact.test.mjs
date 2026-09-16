@@ -40,3 +40,14 @@ test('requêtes : destination inaccessible et erreur fournisseur masquée',async
  assert.equal((await request(server,'/contact_config.json')).status,404);
  assert.equal((await request(server,'/api/contact',{...post(valid),headers:{'Content-Type':'application/json','Origin':'https://attacker.example'}})).status,403);
 });
+
+test('créations : fichiers JPEG filtrés et pièces jointes multipart',async()=>{
+ const image='data:image/jpeg;base64,'+Buffer.from([255,216,255,224,0,2,255,217]).toString('base64');
+ const creation={kind:'shirt',summary:'Dos : CAMILLE',preview:image};
+ assert.ok(validate({...valid,creations:[creation]}));
+ for(const creations of [[creation,creation],[{...creation,preview:'data:text/html;base64,PHNjcmlwdD4='}],[{...creation,kind:'unknown'}],[{...creation,photo:image}],[{...creation,preview:'data:image/jpeg;base64,garbage'}]])assert.equal(validate({...valid,creations}),false);
+ let form;
+ await deliver({...valid,creations:[creation,{kind:'tube',summary:'Texte et photo',preview:image,photo:image}]},async(url,options)=>{form=options.body;assert.equal(options.headers['Content-Type'],undefined);return {ok:true,json:async()=>({success:true})};});
+ assert.ok(form instanceof FormData);assert.match(form.get('creations_summary'),/TEXTILE NON FOURNI/);
+ assert.equal(form.get('attachment_1').name,'badonline-shirt.jpg');assert.equal(form.get('attachment_3').name,'badonline-photo-tube.jpg');
+});

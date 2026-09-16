@@ -15,9 +15,9 @@ def website_assets():
     for image in (PUBLIC / 'assets').glob('*.svg'):
         uri = 'data:image/svg+xml;base64,' + base64.b64encode(image.read_bytes()).decode()
         body = body.replace('/assets/' + image.name, uri)
-    css = (PUBLIC / 'style.css').read_text(encoding='utf-8')
+    css = (PUBLIC / 'style.css').read_text(encoding='utf-8') + '\n' + (PUBLIC / 'studio.css').read_text(encoding='utf-8')
     css += '\n[data-testid="stHeader"]{display:none}[data-testid="stMainBlockContainer"]{padding:0;max-width:none}[data-testid="stMain"]{background:#e8ece9}[data-testid="stVerticalBlock"]{gap:0}'
-    shared = (PUBLIC / 'app.js').read_text(encoding='utf-8').split('// STREAMLIT_SPLIT')[0]
+    shared = (PUBLIC / 'studio.js').read_text(encoding='utf-8') + '\n' + (PUBLIC / 'app.js').read_text(encoding='utf-8').split('// STREAMLIT_SPLIT')[0]
     js = shared + '''\nexport default function(component) {
       const {parentElement, setTriggerValue, data} = component;
       return mountBadonline(parentElement, payload => {setTriggerValue('submission',payload);return null;},data?.result);

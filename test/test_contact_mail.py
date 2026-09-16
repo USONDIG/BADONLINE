@@ -1,4 +1,5 @@
 import json
+import base64
 import unittest
 from unittest.mock import Mock
 from contact_mail import validate, send_request, RateLimiter
@@ -33,6 +34,25 @@ class ContactTest(unittest.TestCase):
         self.assertNotIn('/assets/',html)
         for name in ['Camille','Alex','Léa','Hugo']:self.assertIn(name,html)
         self.assertIn('setTriggerValue',js)
+
+    def test_creation_attachments(self):
+        image = 'data:image/jpeg;base64,' + base64.b64encode(bytes([255,216,255,224,0,2,255,217])).decode()
+        creation = {'kind':'shirt','summary':'Dos : CAMILLE','preview':image}
+        data = validate({**VALID,'creations':[creation]})
+        self.assertIn('TEXTILE NON FOURNI',data['creations_summary'])
+        self.assertEqual(data['attachments'][0][0],'badonline-shirt.jpg')
+        for items in [[creation,creation],[{**creation,'kind':'unknown'}],[{**creation,'preview':'data:text/html;base64,bad'}],[{**creation,'photo':image}],[{**creation,'preview':'data:image/jpeg;base64,bad'}]]:
+            with self.subTest(items=items),self.assertRaises(ValueError):validate({**VALID,'creations':items})
+        response=Mock(status=200)
+        response.read.return_value=b'{"success":"true"}'
+        response.__enter__=Mock(return_value=response)
+        response.__exit__=Mock(return_value=False)
+        opener=Mock(return_value=response)
+        self.assertTrue(send_request({**VALID,'creations':[creation]},opener=opener))
+        request=opener.call_args.args[0]
+        self.assertIn('multipart/form-data',request.get_header('Content-type'))
+        self.assertIn(b'filename="badonline-shirt.jpg"',request.data)
+        self.assertNotIn(b'data:image/jpeg;base64',request.data)
 
     def test_limit(self):
         limiter=RateLimiter()

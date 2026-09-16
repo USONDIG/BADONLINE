@@ -3,6 +3,8 @@ import json
 import re
 import time
 import threading
+import uuid
+from creation_validation import validate_creations
 from collections import deque
 from pathlib import Path
 from urllib.parse import quote
@@ -31,6 +33,9 @@ def validate(data):
     if cleaned['website']:
         raise ValueError('La demande ne peut pas être envoyée.')
     cleaned['quantity'] = str(int(quantity))
+    summary, attachments = validate_creations(data.get('creations', []))
+    cleaned['creations_summary'] = summary
+    cleaned['attachments'] = attachments
     return cleaned
 
 
@@ -53,13 +58,26 @@ class RateLimiter:
 
 def send_request(data, recipient=None, site_url=None, opener=urlopen):
     data = validate(data)
+    attachments = data.pop('attachments')
     payload = {**data, '_subject':'BADONLINE — Nouvelle demande de personnalisation',
                '_template':'table', '_captcha':'false',
                '_url':site_url or CONFIG['site_url']}
+    body = json.dumps(payload).encode()
+    content_type = 'application/json'
+    if attachments:
+        boundary = 'badonline-' + uuid.uuid4().hex
+        chunks = []
+        for key, value in payload.items():
+            chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
+        for index, (filename, image) in enumerate(attachments):
+            chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="attachment_{index+1}"; filename="{filename}"\r\nContent-Type: image/jpeg\r\n\r\n'.encode() + image + b'\r\n')
+        chunks.append(f'--{boundary}--\r\n'.encode())
+        body = b''.join(chunks)
+        content_type = 'multipart/form-data; boundary=' + boundary
     req = Request('https://formsubmit.co/ajax/' + quote(recipient or CONFIG['recipient'], safe='@'),
-                  data=json.dumps(payload).encode(),
-                  headers={'Content-Type':'application/json', 'Accept':'application/json', 'User-Agent':'BADONLINE/1.0'}, method='POST')
-    with opener(req, timeout=20) as response:
+                  data=body,
+                  headers={'Content-Type':content_type, 'Accept':'application/json', 'User-Agent':'BADONLINE/1.0'}, method='POST')
+    with opener(req, timeout=30) as response:
         result = json.loads(response.read(65536))
         if not 200 <= response.status < 300 or str(result.get('success', '')).lower() != 'true':
             raise RuntimeError('Le service d’envoi n’a pas confirmé la demande.')

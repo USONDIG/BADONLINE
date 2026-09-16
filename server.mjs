@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { validateCreations } from './creation-validation.mjs';
 import { deliver } from './mail.mjs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,7 @@ const root = fileURLToPath(new URL('./public/', import.meta.url));
 const projects = ['Textiles de badminton', 'Tubes de volants', 'Textiles et tubes de volants', 'Autre projet'];
 export function validate(data) {
   if (!data || typeof data !== 'object') return false;
+  try { validateCreations(data.creations ?? []); } catch { return false; }
   for (const [key, max] of Object.entries({name:120,email:254,phone:40,personalization:160,website:200,project:80,message:5000})) {
     if (data[key] !== undefined && (typeof data[key] !== 'string' || data[key].length > max)) return false;
   }
@@ -18,7 +20,7 @@ export function createServer({ sender = deliver } = {}) {
     const reply = (code, data) => { res.writeHead(code, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}); res.end(JSON.stringify(data)); };
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
     let url; try { url = new URL(req.url, 'http://localhost'); } catch { return reply(400,{error:'Invalid URL'}); }
     if (url.pathname === '/api/config' && req.method === 'GET') return reply(200,{contactEnabled:true});
     if (url.pathname === '/api/contact' && req.method === 'POST') {
@@ -34,10 +36,11 @@ export function createServer({ sender = deliver } = {}) {
       if (times.length >= 5) return reply(429,{error:'Réessayez dans une minute'});
       attempts.set(key,[...times,now]);
       try {
-        let raw = ''; for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 16000) return reply(413,{error:'Request too large'}); }
+        let raw = ''; for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 4500000) return reply(413,{error:'Request too large'}); }
         let data; try { data = JSON.parse(raw); } catch { return reply(400,{error:'Invalid JSON'}); }
         if (!validate(data)) return reply(400,{error:'Invalid fields'});
         const payload = Object.fromEntries(['name','email','phone','personalization','project','quantity','message','consent'].map(key => [key,data[key] || '']));
+        payload.creations = data.creations ?? [];
         await sender(payload);
         return reply(200,{ok:true,message:'Votre demande a été prise en charge par le service d’envoi. Merci !'});
       } catch { return reply(502,{error:'Delivery unavailable'}); }
