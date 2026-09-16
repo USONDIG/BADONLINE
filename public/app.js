@@ -1,38 +1,42 @@
-const menu = document.querySelector('.menu-button');
-const nav = document.querySelector('#navigation');
-menu.addEventListener('click', () => { const open = menu.getAttribute('aria-expanded') !== 'true'; menu.setAttribute('aria-expanded', String(open)); nav.classList.toggle('open', open); });
-nav.addEventListener('click', e => { if (e.target.closest('a')) { nav.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); } });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && nav.classList.contains('open')) { nav.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); menu.focus(); } });
-document.querySelectorAll('[data-project]').forEach(a => a.addEventListener('click', () => { document.querySelector('[name=project]').value = a.dataset.project; }));
-document.querySelector('a[href="#confidentialite"]').addEventListener('click', () => { document.querySelector('#confidentialite').open = true; });
-document.querySelector('#year').textContent = new Date().getFullYear();
-const form = document.querySelector('#quote-form');
-const status = document.querySelector('#form-status');
-let direct = false;
-fetch('/api/config').then(r => r.ok ? r.json() : {}).then(config => { direct = config.contactEnabled === true; if (direct) document.querySelector('#delivery-note').textContent = 'Votre demande sera transmise directement. Vos coordonnées servent uniquement à vous répondre.'; }).catch(() => {});
-form.addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!form.reportValidity()) return;
-  const data = Object.fromEntries(new FormData(form));
-  const body = `Bonjour BADONLINE,\n\nJe souhaite un devis pour mon projet.\n\nNom : ${data.name}\nE-mail : ${data.email}\nTéléphone : ${data.phone || 'Non renseigné'}\nClub / entreprise : ${data.organization || 'Non renseigné'}\nProjet : ${data.project}\nQuantité estimée : ${data.quantity}\n\n${data.message}\n\nJ’accepte l’utilisation de mes informations pour répondre à cette demande.`;
-  const fallback = () => { document.querySelector('#request-text').value = body; document.querySelector('#mail-fallback').hidden = false; };
-  if (!direct) {
-    fallback();
-    status.textContent = 'Votre demande est préparée. Envoyez l’e-mail depuis votre messagerie pour la transmettre : rien n’a encore été envoyé par le site.';
-    window.location.href = `mailto:bastien.sudan@gmail.com?subject=${encodeURIComponent('Demande de devis BADONLINE — ' + data.project)}&body=${encodeURIComponent(body)}`;
-    return;
-  }
-  const button = form.querySelector('[type=submit]');
-  button.disabled = true;
-  status.textContent = 'Transmission de votre demande…';
-  try {
-    const response = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    if (!response.ok) throw new Error('Send failed');
-    status.textContent = 'Votre demande a bien été transmise. Merci !';
-    form.reset(); document.querySelector('#mail-fallback').hidden = true;
-  } catch { status.textContent = 'La demande n’a pas pu être confirmée. Vous pouvez nous écrire directement avec le texte ci-dessous.'; fallback(); }
-  finally { button.disabled = false; }
+// Shared UI for the Node site and the Streamlit component.
+function mountBadonline(root, send, result = null) {
+  const controller = new AbortController();
+  const listen = (element, event, handler) => element?.addEventListener(event, handler, {signal:controller.signal});
+  const find = selector => root.querySelector(selector);
+  const menu = find('.menu-button');
+  const nav = find('#navigation');
+  listen(menu, 'click', () => { const open = menu.getAttribute('aria-expanded') !== 'true'; menu.setAttribute('aria-expanded',String(open)); nav.classList.toggle('open',open); });
+  listen(root, 'keydown', e => { if(e.key === 'Escape' && nav.classList.contains('open')) {nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.focus();} });
+  root.querySelectorAll('a[href^="#"]').forEach(link => listen(link,'click',e => {
+    e.preventDefault();
+    if (link.dataset.project) find('[name=project]').value = link.dataset.project;
+    if (link.dataset.example) find('[name=message]').value = `Je souhaite personnaliser un t-shirt inspiré de : ${link.dataset.example}.\nPrénom à imprimer : \nTaille : \nCouleurs souhaitées : `;
+    const id=link.getAttribute('href').slice(1) || 'main';
+    const target=find('#'+id);
+    if (id==='confidentialite') target.open=true;
+    target?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+    nav.classList.remove('open');menu.setAttribute('aria-expanded','false');
+  }));
+  find('#year').textContent=new Date().getFullYear();
+  const form=find('#quote-form'), status=find('#form-status'), button=form.querySelector('[type=submit]');
+  const show = reply => {status.textContent=reply.message;button.disabled=false;if(reply.ok)form.reset();};
+  if(result && form.dataset.receipt!==result.id){show(result);form.dataset.receipt=result.id;}
+  listen(form,'submit',async e=>{
+    e.preventDefault();if(!form.reportValidity() || button.disabled)return;
+    button.disabled=true;status.textContent='Transmission de votre demande…';
+    const data=Object.fromEntries(new FormData(form));data.request_id=crypto.randomUUID();
+    try {const reply=await send(data);if(reply)show(reply);}
+    catch {show({ok:false,message:'L’envoi n’a pas pu être confirmé. Vos informations sont conservées dans le formulaire. Réessayez dans un instant.'});}
+  });
+  const mobile=find('.mobile-cta');
+  const observer=new IntersectionObserver(entries=>mobile.classList.toggle('hidden',entries[0].isIntersecting),{threshold:0});
+  observer.observe(find('#contact'));
+  return ()=>{controller.abort();observer.disconnect();};
+}
+// STREAMLIT_SPLIT: the adapter loads only the reusable function above.
+mountBadonline(document,async data=>{
+  const response=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(25000)});
+  const body=await response.json();
+  if(!response.ok)throw new Error('Delivery unavailable');
+  return {ok:true,message:body.message || 'Votre demande a été prise en charge par le service d’envoi. Merci !'};
 });
-document.querySelector('#copy-request').addEventListener('click', async () => { const field = document.querySelector('#request-text'); try { await navigator.clipboard.writeText(field.value); status.textContent = 'Demande copiée. Collez-la dans un e-mail à bastien.sudan@gmail.com puis envoyez-le.'; } catch { field.focus(); field.select(); status.textContent = 'Sélectionnez et copiez ce texte pour l’envoyer par e-mail.'; } });
-const mobile = document.querySelector('.mobile-cta');
-new IntersectionObserver(entries => { mobile.classList.toggle('hidden', entries[0].isIntersecting); }, { threshold: 0 }).observe(document.querySelector('#contact'));

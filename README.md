@@ -1,27 +1,37 @@
 # BADONLINE
 
-Site français responsive pour la personnalisation de textiles de badminton et de tubes de volants. Le dépôt était vide au démarrage : HTML, CSS, JavaScript natif et serveur Node sans dépendance ont été choisis pour conserver un site simple à maintenir.
+Site français de personnalisation badminton destiné aux particuliers : t-shirts, maillots et tubes de volants. Design neumorphism gris perle, vert forêt et lime, responsive. Quatre concepts illustrés avec les prénoms fictifs Camille, Alex, Léa et Hugo.
 
-## Utilisation
+## Streamlit Community Cloud
 
-Node.js 22 ou plus récent. Aucun paquet à installer.
+Déployer `USONDIG/BADONLINE`, branche `main`, fichier `streamlit_app.py`, Python 3.12 ou plus récent. `requirements.txt` fixe la version de Streamlit.
 
-- `npm start` : aperçu à http://127.0.0.1:3000.
-- `npm test` : validation et tests HTTP du formulaire.
-- `npm run build` : copie des fichiers publics dans `dist/` pour hébergement statique.
+Le composant Streamlit transmet le formulaire au serveur Python, qui contacte FormSubmit en HTTPS. La destination ne figure ni dans le HTML ni dans le JavaScript envoyé au navigateur. Les illustrations et les styles existants sont réutilisés. Le serveur Node n’est pas nécessaire à Streamlit.
 
-Les chemins d’assets sont absolus : héberger à la racine d’un domaine. Pour GitHub Pages sous `/BADONLINE/`, adapter les chemins ou utiliser un domaine personnalisé. Le push GitHub ne déploie pas automatiquement le site.
+## Activation FormSubmit (sans compte)
 
-## Réception des devis
+1. Envoyer une première demande : FormSubmit adresse un e-mail d’activation au destinataire.
+2. Le destinataire clique sur le lien reçu pour autoriser la réception. Vérifier les indésirables.
+3. Faire un essai après confirmation et vérifier sa réception réelle avant de considérer l’envoi opérationnel.
 
-Par défaut, le formulaire prépare un e-mail vers **bastien.sudan@gmail.com** dans la messagerie du visiteur. Il indique explicitement que le visiteur doit envoyer ce message. Un texte copiable permet de terminer la demande sans application de messagerie configurée. Aucun faux succès et aucun envoi externe automatique.
+La destination actuelle est définie uniquement dans `contact_config.json`, chargé côté serveur. Le dépôt GitHub étant public, cela masque l’adresse sur le site mais ne la rend pas secrète dans le dépôt ou son historique. Pour retirer aussi l’adresse de la version courante du dépôt, utiliser l’identifiant opaque fourni par FormSubmit après activation, ou stocker la destination dans les Secrets Streamlit sous `FORMSUBMIT_RECIPIENT` puis retirer la valeur du fichier serveur. Ne jamais publier de clés ni de secrets.
 
-Pour un envoi direct, définir `CONTACT_WEBHOOK_URL` avec l’URL HTTPS d’un service de réception maîtrisé, puis démarrer le serveur Node. Le serveur transmet un JSON avec `name`, `email`, `phone`, `organization`, `project`, `quantity`, `message`, `consent`. La destination reste côté serveur ; ne jamais exposer un secret dans les fichiers publics. Configurer le service pour remettre les demandes à l’adresse ci-dessus et tester la réception réelle avant activation. L’endpoint doit répondre en 2xx uniquement quand la demande est acceptée durablement.
+Configurer aussi `SITE_URL` dans les Secrets Streamlit avec l’URL publique du site pour identifier correctement sa provenance. Sans cette valeur, le dépôt GitHub sert de référence dans les e-mails.
 
-Exemple : `node --env-file=.env server.mjs` après avoir copié `.env.example` dans `.env`. Le serveur écoute en local ; pour un hébergement public utiliser un reverse proxy HTTPS. La limite d’envoi en mémoire (5 requêtes/minute/adresse IP) convient à une instance. Derrière un proxy, prévoir une limitation au niveau du proxy plutôt que de faire confiance arbitrairement à X-Forwarded-For. Aucun contenu de demande n’est journalisé ou stocké localement.
+Pas de mot de passe Gmail, pas de clé d’API et pas de compte FormSubmit. Le succès affiché signifie que FormSubmit a accepté la demande, pas qu’un e-mail est arrivé dans la boîte de réception. Les erreurs sont génériques et ne révèlent pas le destinataire. Aucun contenu utilisateur n’est injecté en HTML ou journalisé.
 
-## Contenu et confidentialité
+Protection : validation serveur, consentement obligatoire, champ piège anti-spam, délai de 30 secondes par session Streamlit et plafond de 30 tentatives par heure par processus. La voie AJAX utilise `_captcha=false` : ces protections ne remplacent pas un CAPTCHA ou une protection distribuée pour un site à fort trafic. Aucune réponse automatique n’est envoyée au visiteur.
 
-Les illustrations SVG sont des concepts originaux, pas des photos de réalisations. Aucun tarif, avis client, délai ou certification n’est inventé. Les informations légales d’entreprise (raison sociale, responsable, adresse, immatriculation, hébergeur), la durée de conservation réelle et les sous-traitants de réception restent à compléter par l’exploitant avant une exploitation commerciale publique.
+FormSubmit conserve les soumissions pendant 30 jours, comme indiqué dans la notice du site. Les informations légales d’entreprise et les durées de conservation dans la messagerie de l’exploitant restent à compléter.
 
-Navigation clavier, champs associés à leurs libellés, contraste, mouvement réduit, menu mobile, FAQ native et statut de formulaire accessible. Aucun service de police, cookie publicitaire ou outil de suivi externe.
+## Version Node
+
+Node 22+, sans dépendance. `npm start` lance http://127.0.0.1:3000 ; `npm test` vérifie le serveur et l’intégration d’envoi simulée. `npm run build` copie les fichiers publics dans `dist/`. Un hébergement uniquement statique ne suffit plus au formulaire : utiliser Node ou Streamlit pour conserver la destination côté serveur.
+
+`FORMSUBMIT_RECIPIENT` et `SITE_URL` peuvent également être définis dans l’environnement Node. `.env.example` contient les noms de variables. Le serveur écoute en local ; utiliser un reverse proxy HTTPS en production.
+
+## Vérification Python
+
+`python -m unittest discover -s test -p 'test_*.py'`
+
+Les tests utilisent des réponses simulées et n’envoient pas d’e-mails. Pour lancer le site : `pip install -r requirements.txt` puis `streamlit run streamlit_app.py`.
