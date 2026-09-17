@@ -4,7 +4,7 @@ import base64
 import re
 import os
 import time
-from contact_mail import send_request, RateLimiter
+from contact_mail import send_request, RateLimiter, DeliveryError
 
 PUBLIC = Path(__file__).parent / 'public'
 
@@ -67,6 +67,8 @@ def main():
                 raise RuntimeError('Rate limited')
             send_request(data,recipient=setting('FORMSUBMIT_RECIPIENT'),site_url=setting('SITE_URL'))
             result.update(ok=True,message='Votre demande a été prise en charge par le service d’envoi. Merci !')
+        except DeliveryError as error:
+            result['message'] = str(error)
         except ValueError as error:
             result['message'] = str(error)
         except Exception:

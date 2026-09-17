@@ -7,11 +7,27 @@ import uuid
 from creation_validation import validate_creations
 from collections import deque
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 PROJECTS = ('Textiles de badminton', 'Tubes de volants', 'Textiles et tubes de volants', 'Autre projet')
 CONFIG = json.loads((Path(__file__).parent / 'contact_config.json').read_text())
+
+
+class DeliveryError(RuntimeError):
+    """Only fixed, public-safe messages may cross the component boundary."""
+    MESSAGES = {
+        'activation': 'Le service de contact attend son activation par BADONLINE. Votre demande n’a pas été envoyée ; vos informations sont conservées.',
+        'refused': 'Le service d’envoi a refusé la demande. Vos informations sont conservées. Référence : MAIL-REFUSED.',
+        'network': 'Le serveur ne parvient pas à joindre le service d’envoi. Vos informations sont conservées. Référence : MAIL-NETWORK.',
+        'response': 'Le service d’envoi a renvoyé une réponse inattendue. L’envoi n’est pas confirmé. Référence : MAIL-RESPONSE.',
+        'limited': 'Le service d’envoi reçoit trop de demandes. Patientez quelques minutes. Référence : MAIL-LIMIT.',
+    }
+
+    def __init__(self, code):
+        self.code = code
+        super().__init__(self.MESSAGES[code])
 
 
 def validate(data):
@@ -77,8 +93,21 @@ def send_request(data, recipient=None, site_url=None, opener=urlopen):
     req = Request('https://formsubmit.co/ajax/' + quote(recipient or CONFIG['recipient'], safe='@'),
                   data=body,
                   headers={'Content-Type':content_type, 'Accept':'application/json', 'User-Agent':'BADONLINE/1.0'}, method='POST')
-    with opener(req, timeout=30) as response:
-        result = json.loads(response.read(65536))
-        if not 200 <= response.status < 300 or str(result.get('success', '')).lower() != 'true':
-            raise RuntimeError('Le service d’envoi n’a pas confirmé la demande.')
+    try:
+        with opener(req, timeout=30) as response:
+            result = json.loads(response.read(65536))
+            if not isinstance(result, dict):
+                raise DeliveryError('response')
+            # Activation responses must never be presented as a delivered quote.
+            message = str(result.get('message', '')).lower()
+            if any(word in message for word in ('activate', 'activation', 'confirm your email')):
+                raise DeliveryError('activation')
+            if not 200 <= response.status < 300 or str(result.get('success', '')).lower() != 'true':
+                raise DeliveryError('refused')
+    except HTTPError as error:
+        raise DeliveryError('limited' if error.code == 429 else 'refused') from None
+    except (URLError, TimeoutError, OSError):
+        raise DeliveryError('network') from None
+    except (ValueError, UnicodeError):
+        raise DeliveryError('response') from None
     return True
