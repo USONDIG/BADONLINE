@@ -8,7 +8,7 @@ from creation_validation import validate_creations
 from collections import deque
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlsplit, urlencode
 from urllib.request import Request, urlopen
 
 PROJECTS = ('Textiles de badminton', 'Tubes de volants', 'Textiles et tubes de volants', 'Autre projet')
@@ -79,8 +79,8 @@ def send_request(data, recipient=None, site_url=None, opener=urlopen):
     payload = {**data, '_subject':'BADONLINE — Nouvelle demande de personnalisation',
                '_template':'table', '_captcha':'false',
                '_url':site_url or CONFIG['site_url']}
-    body = json.dumps(payload).encode()
-    content_type = 'application/json'
+    body = urlencode(payload).encode()
+    content_type = 'application/x-www-form-urlencoded'
     if attachments:
         boundary = 'badonline-' + uuid.uuid4().hex
         chunks = []
