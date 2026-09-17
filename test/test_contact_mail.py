@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qsl
 import base64
 import unittest
 from unittest.mock import Mock
@@ -21,7 +22,7 @@ class ContactTest(unittest.TestCase):
         opener=Mock(return_value=response)
         self.assertTrue(send_request({**VALID,'_cc':'attacker@example.com'},opener=opener))
         request=opener.call_args.args[0]
-        payload=json.loads(request.data)
+        payload=dict(parse_qsl(request.data.decode()))
         self.assertEqual(request.get_header('Referer'), payload['_url'])
         self.assertEqual(request.get_header('Origin'), 'https://badonline.streamlit.app')
         self.assertEqual(payload['personalization'],'CAMILLE')
