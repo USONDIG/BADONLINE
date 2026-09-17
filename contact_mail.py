@@ -25,10 +25,10 @@ class DeliveryError(RuntimeError):
         'limited': 'Le service d’envoi reçoit trop de demandes. Patientez quelques minutes. Référence : MAIL-LIMIT.',
     }
 
-    def __init__(self, code, status=None):
+    def __init__(self, code, status=None, detail=''):
         self.code = code
         suffix = f' (HTTP {int(status)})' if status is not None else ''
-        super().__init__(self.MESSAGES[code] + suffix)
+        super().__init__(self.MESSAGES[code] + suffix + (' Détail du service : ' + detail if detail else ''))
 
 
 def validate(data):
@@ -104,7 +104,12 @@ def send_request(data, recipient=None, site_url=None, opener=urlopen):
             if any(word in message for word in ('activate', 'activation', 'confirm your email')):
                 raise DeliveryError('activation')
             if not 200 <= response.status < 300 or str(result.get('success', '')).lower() != 'true':
-                raise DeliveryError('refused')
+                detail = str(result.get('message', result.get('error', '')))
+                for private in (recipient, CONFIG['recipient']):
+                    if private:
+                        detail = detail.replace(private, '[adresse masquée]')
+                detail = re.sub(r'https?://\S+|[^\s<>\"@]+@[^\s<>\"]+', '[adresse masquée]', detail)
+                raise DeliveryError('refused', detail=detail[:300])
     except HTTPError as error:
         raise DeliveryError('limited' if error.code == 429 else 'refused', error.code) from None
     except (URLError, TimeoutError, OSError):
