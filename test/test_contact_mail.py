@@ -2,7 +2,7 @@ import json
 import base64
 import unittest
 from unittest.mock import Mock
-from contact_mail import validate, send_request, RateLimiter
+from contact_mail import validate, send_request, RateLimiter, DeliveryError
 from streamlit_app import website_assets
 
 VALID={'name':'Camille Exemple','email':'camille@example.com','project':'Textiles de badminton','quantity':'1','personalization':'CAMILLE','message':'Un t-shirt vert taille M.','consent':'on'}
@@ -53,6 +53,25 @@ class ContactTest(unittest.TestCase):
         self.assertIn('multipart/form-data',request.get_header('Content-type'))
         self.assertIn(b'filename="badonline-shirt.jpg"',request.data)
         self.assertNotIn(b'data:image/jpeg;base64',request.data)
+
+    def test_delivery_errors_are_safe_and_activation_is_not_success(self):
+        from urllib.error import URLError, HTTPError
+        for error, code in [(URLError('private@example.com'), 'network'),
+                            (HTTPError('https://private.example', 429, 'secret', {}, None), 'limited')]:
+            with self.assertRaises(DeliveryError) as raised:
+                send_request(VALID, opener=Mock(side_effect=error))
+            self.assertEqual(raised.exception.code, code)
+            self.assertNotIn('private', str(raised.exception))
+        response = Mock(status=200)
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        for body, code in [(b'{"success":true,"message":"Please activate your form private@example.com"}', 'activation'),
+                           (b'<html>private@example.com</html>', 'response')]:
+            response.read.return_value = body
+            with self.assertRaises(DeliveryError) as raised:
+                send_request(VALID, opener=Mock(return_value=response))
+            self.assertEqual(raised.exception.code, code)
+            self.assertNotIn('private', str(raised.exception))
 
     def test_limit(self):
         limiter=RateLimiter()

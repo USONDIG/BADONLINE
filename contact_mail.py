@@ -25,9 +25,10 @@ class DeliveryError(RuntimeError):
         'limited': 'Le service d’envoi reçoit trop de demandes. Patientez quelques minutes. Référence : MAIL-LIMIT.',
     }
 
-    def __init__(self, code):
+    def __init__(self, code, status=None):
         self.code = code
-        super().__init__(self.MESSAGES[code])
+        suffix = f' (HTTP {int(status)})' if status is not None else ''
+        super().__init__(self.MESSAGES[code] + suffix)
 
 
 def validate(data):
@@ -105,7 +106,7 @@ def send_request(data, recipient=None, site_url=None, opener=urlopen):
             if not 200 <= response.status < 300 or str(result.get('success', '')).lower() != 'true':
                 raise DeliveryError('refused')
     except HTTPError as error:
-        raise DeliveryError('limited' if error.code == 429 else 'refused') from None
+        raise DeliveryError('limited' if error.code == 429 else 'refused', error.code) from None
     except (URLError, TimeoutError, OSError):
         raise DeliveryError('network') from None
     except (ValueError, UnicodeError):
