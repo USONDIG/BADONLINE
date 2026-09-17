@@ -22,6 +22,8 @@ class ContactTest(unittest.TestCase):
         self.assertTrue(send_request({**VALID,'_cc':'attacker@example.com'},opener=opener))
         request=opener.call_args.args[0]
         payload=json.loads(request.data)
+        self.assertEqual(request.get_header('Referer'), payload['_url'])
+        self.assertEqual(request.get_header('Origin'), 'https://badonline.streamlit.app')
         self.assertEqual(payload['personalization'],'CAMILLE')
         self.assertNotIn('_cc',payload)
         response.read.return_value=b'{"success":"false"}'

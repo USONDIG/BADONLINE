@@ -8,7 +8,7 @@ from creation_validation import validate_creations
 from collections import deque
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 PROJECTS = ('Textiles de badminton', 'Tubes de volants', 'Textiles et tubes de volants', 'Autre projet')
@@ -91,9 +91,11 @@ def send_request(data, recipient=None, site_url=None, opener=urlopen):
         chunks.append(f'--{boundary}--\r\n'.encode())
         body = b''.join(chunks)
         content_type = 'multipart/form-data; boundary=' + boundary
+    origin = urlsplit(payload['_url'])
+    origin = origin.scheme + '://' + origin.netloc
     req = Request('https://formsubmit.co/ajax/' + quote(recipient or CONFIG['recipient'], safe='@'),
                   data=body,
-                  headers={'Content-Type':content_type, 'Accept':'application/json', 'User-Agent':'BADONLINE/1.0'}, method='POST')
+                  headers={'Content-Type':content_type, 'Accept':'application/json', 'User-Agent':'BADONLINE/1.0', 'Referer':payload['_url'], 'Origin':origin}, method='POST')
     try:
         with opener(req, timeout=30) as response:
             result = json.loads(response.read(65536))

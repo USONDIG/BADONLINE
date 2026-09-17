@@ -13,6 +13,8 @@ export async function deliver(data, fetcher=fetch) {
     attachments.forEach((file,i)=>form.append(`attachment_${i+1}`,new Blob([file.bytes],{type:'image/jpeg'}),file.name));
     body=form;headers={'Accept':'application/json'};
   }
+  headers.Referer=payload._url;
+  headers.Origin=new URL(payload._url).origin;
   const response=await fetcher('https://formsubmit.co/ajax/'+encodeURIComponent(recipient),{
     method:'POST',headers,body,signal:AbortSignal.timeout(30000)
   });
