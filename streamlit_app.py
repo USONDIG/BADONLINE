@@ -38,7 +38,7 @@ def main():
     html, css, js = website_assets()
 
     @st.cache_resource
-    def component():
+    def component(html, css, js):
         return st.components.v2.component('badonline_website',html=html,css=css,js=js,isolate_styles=False)
 
     @st.cache_resource
@@ -53,7 +53,7 @@ def main():
         except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
             return None
 
-    outcome = component()(key='website',data={'result':st.session_state.get('delivery_result')},on_submission_change=lambda:None)
+    outcome = component(html, css, js)(key='website',data={'result':st.session_state.get('delivery_result')},on_submission_change=lambda:None)
     data = outcome.submission
     if not isinstance(data,dict):
         return
