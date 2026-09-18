@@ -51,7 +51,7 @@ export function createServer({ sender = deliver } = {}) {
       const filename = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
       if (!filename.startsWith(root)) return reply(403,{error:'Forbidden'});
       const content = await readFile(filename);
-      const mime = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml'}[path.extname(filename)] || 'application/octet-stream';
+      const mime = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg'}[path.extname(filename)] || 'application/octet-stream';
       res.writeHead(200,{'Content-Type':mime}); res.end(req.method === 'HEAD' ? undefined : content);
     } catch { reply(404,{error:'Not found'}); }
   });

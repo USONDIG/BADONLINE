@@ -8,7 +8,7 @@ function mountStudio(root, listen) {
   const bgPalette = [['#aed3eb','Bleu ciel'],['#243c30','Vert forêt'],['#e9e5d7','Crème'],['#d8b5ca','Rose'],['#e9b077','Abricot']];
   const fonts = {sport:['900','Arial, sans-serif','Sport'],classic:['600','Georgia, serif','Classique'],script:['500','cursive','Manuscrite']};
   const clamp = (n,a,b) => Math.min(b,Math.max(a,n));
-  const shirtDefault = () => ({color:'#243c30',view:'back',front:{text:'',color:'#f0e8d0',font:'sport',placement:'center',size:40},back:{text:'CAMILLE',color:'#f0e8d0',font:'sport',placement:'upper',size:40}});
+  const shirtDefault = () => ({model:'yonex-10726-navy',color:'#243c30',view:'back',front:{text:'',color:'#f0e8d0',font:'sport',placement:'center',size:40},back:{text:'CAMILLE',color:'#f0e8d0',font:'sport',placement:'upper',size:40}});
   const textLayer = (text,y=.23) => ({id:crypto.randomUUID(),type:'text',text,color:'#22362b',font:'sport',x:.5,y,size:64,rotation:0});
   const tubeDefault = () => {const a=textLayer('ALEX'),b=textLayer('PLAY YOUR WAY',.79);b.size=50;return {color:'#aed3eb',layers:[a,b],selected:a.id};};
   const state = root.__badonlineStudioState || {tab:'shirt',shirt:shirtDefault(),tube:tubeDefault(),creations:[],uploadVersion:0};
@@ -24,7 +24,48 @@ function mountStudio(root, listen) {
     choices.forEach(([color,name])=>{const b=document.createElement('button');b.type='button';b.style.backgroundColor=color;b.dataset.color=color;b.setAttribute('aria-label',name);b.title=name;b.setAttribute('aria-pressed',String(get()===color));listen(b,'click',()=>{set(color);render();});box.append(b);});
   }
   function refreshSwatches(selector,value){$(selector).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===value)));}
+  const selectedModel = () => BADONLINE_SHIRTS.find(m=>m.id===state.shirt.model);
+  const photos = new Map();
+  function photo(src){
+    if(!photos.has(src)){
+      const image=new Image();const entry={image,ready:false,error:false};photos.set(src,entry);
+      image.onload=()=>{entry.ready=true;if(root.isConnected!==false)render();};
+      image.onerror=()=>{entry.error=true;if(root.isConnected!==false)render();};image.src=src;
+    }
+    return photos.get(src);
+  }
+  function photosReady(){const m=selectedModel();return !m || [photo(m.front),photo(m.back)].every(p=>p.ready);}
+  function syncCatalog(){
+    const m=selectedModel(),brand=m?.brand || 'generic';$('#shirt-brand').value=brand;
+    const select=$('#shirt-model');
+    if(select.dataset.brand!==brand){
+      select.replaceChildren();
+      const models=BADONLINE_SHIRTS.filter(x=>x.brand===brand);
+      if(!models.length){const o=document.createElement('option');o.value='generic';o.textContent='Mon propre textile — aperçu uni';select.append(o);}
+      models.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=`${x.code} · ${x.color}`;select.append(o);});
+      select.dataset.brand=brand;
+    }
+    select.value=m?.id || 'generic';
+    $('#shirt-generic-colors').hidden=Boolean(m);
+    $('#shirt-model-info').textContent=m?`${m.brand} ${m.code} · ${m.color} · Collection ${m.season}`:'Aperçu générique de votre vêtement.';
+    const link=$('#shirt-model-source');link.hidden=!m;if(m)link.href=m.source;
+    const ready=photosReady();$('#shirt-download').disabled=!ready;
+    $('#shirt-add').disabled=!ready || (!state.shirt.front.text.trim()&&!state.shirt.back.text.trim());
+  }
+  function drawProductShirt(canvas,view,m){
+    const c=canvas.getContext('2d'),d=state.shirt[view],p=photo(m[view]);c.clearRect(0,0,840,850);
+    canvas.setAttribute('aria-label',`${m.brand} ${m.code}, ${m.color}, ${view==='front'?'face':'dos'}, texte : ${d.text || 'aucun'}`);
+    if(!p.ready){c.fillStyle='#22362b';c.font='22px Arial';c.textAlign='center';c.fillText(p.error?'Photo indisponible. Rechargez la page.':'Chargement du modèle…',420,410);return false;}
+    const ratio=Math.min(780/p.image.naturalWidth,810/p.image.naturalHeight),w=p.image.naturalWidth*ratio,h=p.image.naturalHeight*ratio,x=(840-w)/2,y=(850-h)/2;
+    c.drawImage(p.image,x,y,w,h);
+    const positions=view==='front'?{chest:[.36,.30,.19],center:[.5,.47,.48]}:{upper:[.5,.29,.48],center:[.5,.46,.48]};
+    const [rx,ry,rw]=positions[d.placement]||positions.center;
+    const [weight,family]=fonts[d.font];let actual=d.size;c.font=`${weight} ${actual}px ${family}`;
+    while(c.measureText(d.text).width>w*rw && actual>9){actual-=.5;c.font=`${weight} ${actual}px ${family}`;}
+    c.fillStyle=d.color;c.textAlign='center';c.textBaseline='middle';c.fillText(d.text,x+w*rx,y+h*ry,w*rw);return actual<d.size;
+  }
   function drawShirt(canvas,view=state.shirt.view){
+    const model=selectedModel();if(model)return drawProductShirt(canvas,view,model);
     const c=canvas.getContext('2d'),s=state.shirt,d=s[view];
     c.clearRect(0,0,840,850);
     const shape=new Path2D('M290 110 L186 157 L71 342 L193 411 L240 330 L218 750 Q420 796 622 750 L600 330 L647 411 L769 342 L654 157 L550 110 Q420 152 290 110 Z');
@@ -121,12 +162,14 @@ function mountStudio(root, listen) {
     state.tab=tab;root.querySelectorAll('[data-studio-tab]').forEach(b=>{const active=b.dataset.studioTab===tab;b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});
     $('#panel-shirt').hidden=tab!=='shirt';$('#panel-tube').hidden=tab!=='tube';render();
   }
-  function render(){syncShirt();const fitted=drawShirt(shirtCanvas);$('#shirt-fit-note').textContent=fitted?'Le texte a été réduit pour rester dans la zone de marquage.':'La couleur du vêtement est une simulation de votre textile.';drawTube();refreshSwatches('#tube-colors',state.tube.color);syncControls();}
+  function render(){syncShirt();syncCatalog();const fitted=drawShirt(shirtCanvas);$('#shirt-fit-note').textContent=fitted?'Le texte a été réduit pour rester dans la zone de marquage.':(selectedModel()?'Photographie du modèle officiel. Placement indicatif à valider avant marquage.':'La couleur du vêtement est une simulation de votre textile.');drawTube();refreshSwatches('#tube-colors',state.tube.color);syncControls();}
   function jpeg(canvas){const value=canvas.toDataURL('image/jpeg',.85);if(value.length>1400000)throw new Error('Image trop volumineuse');return value;}
   function shirtSheet(){
+    if(!photosReady())throw new Error('Attendez le chargement des photos du textile.');
     const out=document.createElement('canvas');out.width=1200;out.height=690;const c=out.getContext('2d');c.fillStyle='#e8ece9';c.fillRect(0,0,1200,690);
     const each=document.createElement('canvas');each.width=840;each.height=850;
     for(const [i,view] of ['front','back'].entries()){drawShirt(each,view);c.drawImage(each,0,0,840,850,i*600+30,20,540,547);c.fillStyle='#22362b';c.font='bold 22px Arial';c.textAlign='center';c.fillText(view==='front'?'FACE':'DOS',i*600+300,600);}
+    const model=selectedModel();if(model){c.font='18px Arial';c.fillText(`${model.brand} ${model.code} · ${model.color} · ${model.season}`,600,626);}
     c.font='18px Arial';c.fillText('BADONLINE · Simulation indicative · Textile non fourni, apporté par le client',600,654);return out;
   }
   function tubeSheet(){
@@ -134,7 +177,7 @@ function mountStudio(root, listen) {
   }
   function summary(kind){
     if(kind==='shirt'){
-      const s=state.shirt;return `T-shirt — textile fourni par le client. Couleur simulée : ${colorName(s.color,palette)}. `+['front','back'].map(view=>{const d=s[view];return `${view==='front'?'Face':'Dos'} : ${d.text || 'aucun texte'}, ${fonts[d.font][2]}, couleur ${d.color}, position ${{upper:'haut du dos',center:'centre',chest:'petite poitrine'}[d.placement]}, taille visuelle ${d.size}.`;}).join(' ');
+      const s=state.shirt,m=selectedModel();return `T-shirt — textile fourni par le client. ${m?`Référence : ${m.brand} ${m.code}, collection ${m.season}, coloris ${m.color}.`:`Textile générique. Couleur simulée : ${colorName(s.color,palette)}.`} `+['front','back'].map(view=>{const d=s[view];return `${view==='front'?'Face':'Dos'} : ${d.text || 'aucun texte'}, ${fonts[d.font][2]}, couleur ${d.color}, position ${{upper:'haut du dos',center:'centre',chest:'petite poitrine'}[d.placement]}, taille visuelle ${d.size}.`;}).join(' ');
     }
     return `Tube — fond ${colorName(state.tube.color,bgPalette)}. `+state.tube.layers.map(l=>`${l.type==='text'?`Texte « ${l.text} », ${fonts[l.font][2]}, couleur ${l.color}`:`Photo, cadrage ${l.crop==='cover'?'carré':'photo entière'}, recadrage horizontal ${l.cropX} %, vertical ${l.cropY} %`}, x ${Math.round(l.x*100)} %, y ${Math.round(l.y*100)} %, taille ${Math.round(l.size)} %, rotation ${l.rotation}°.`).join(' ');
   }
@@ -165,6 +208,8 @@ function mountStudio(root, listen) {
       $('#contact').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
     }catch{notice('Impossible de préparer cet aperçu. Réduisez la taille de la photo puis réessayez.');}
   }
+  listen($('#shirt-brand'),'change',e=>{const model=BADONLINE_SHIRTS.find(m=>m.brand===e.target.value);state.shirt.model=model?.id || 'generic';render();});
+  listen($('#shirt-model'),'change',e=>{state.shirt.model=e.target.value;if(selectedModel()?.color==='Blanc'){state.shirt.front.color='#22362b';state.shirt.back.color='#22362b';}else{state.shirt.front.color='#ffffff';state.shirt.back.color='#ffffff';}render();});
   swatches('#shirt-colors',palette,()=>state.shirt.color,v=>state.shirt.color=v);
   swatches('#shirt-ink-colors',inkPalette,()=>state.shirt[state.shirt.view].color,v=>state.shirt[state.shirt.view].color=v);
   swatches('#tube-colors',bgPalette,()=>state.tube.color,v=>state.tube.color=v);
@@ -229,7 +274,7 @@ function mountStudio(root, listen) {
     creations:()=>state.creations.map(c=>({...c})),
     clearCreations:()=>{state.creations=[];renderCreations();},
     open:(kind,example='')=>{
-      if(example){const presets={Camille:['#243c30','CAMILLE'],Alex:['#203957','ALEX'],Léa:['#f1f0e9','LÉA'],Hugo:['#252629','HUGO 07']};const key=Object.keys(presets).find(k=>example.includes(k));if(key){state.shirt.color=presets[key][0];state.shirt.view='back';state.shirt.back.text=presets[key][1];state.shirt.back.color=key==='Léa'?'#693a59':key==='Hugo'?'#ed994e':'#f0e8d0';}}
+      if(example){const presets={Camille:['#243c30','CAMILLE'],Alex:['#203957','ALEX'],Léa:['#f1f0e9','LÉA'],Hugo:['#252629','HUGO 07']};const key=Object.keys(presets).find(k=>example.includes(k));if(key){state.shirt.model='generic';state.shirt.color=presets[key][0];state.shirt.view='back';state.shirt.back.text=presets[key][1];state.shirt.back.color=key==='Léa'?'#693a59':key==='Hugo'?'#ed994e':'#f0e8d0';}}
       setTab(kind);$('#atelier').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
     }
   };

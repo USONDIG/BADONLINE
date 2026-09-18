@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="fr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#e8ece9"><meta name="description" content="Personnalisez votre t-shirt de badminton avec votre prénom, vos couleurs ou votre surnom. Présentez votre projet BADONLINE et demandez un devis personnalisé."><title>BADONLINE — Votre style. Vos couleurs. Votre jeu.</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/studio.css"><script src="/studio.js" defer></script><script src="/app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#e8ece9"><meta name="description" content="Personnalisez votre t-shirt de badminton avec votre prénom, vos couleurs ou votre surnom. Présentez votre projet BADONLINE et demandez un devis personnalisé."><title>BADONLINE — Votre style. Vos couleurs. Votre jeu.</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/studio.css"><script src="/shirt-catalog.js" defer></script><script src="/studio.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <a class="skip" href="#main">Aller au contenu</a>
 <header class="header wrap"><a class="brand" href="#" aria-label="BADONLINE, accueil"><span class="brand-mark">B.</span> BADONLINE</a><button class="menu-button soft" type="button" aria-expanded="false" aria-controls="navigation">Menu <span aria-hidden="true">☰</span></button><nav id="navigation" aria-label="Navigation principale"><a href="#atelier">Personnaliser</a><a href="#collection">Inspirations</a><a href="#processus">Comment ça marche</a><a href="#faq">FAQ</a></nav><a class="button small dark header-cta" href="#contact">Parlons de votre projet <span aria-hidden="true">↗</span></a></header>
@@ -23,9 +23,16 @@
     </div>
     <div class="studio-controls soft">
       <h3>Mon t-shirt, à ma façon.</h3>
-      <p class="textile-notice"><strong>Textile non fourni.</strong> Vous fournissez votre t-shirt. La couleur ci-dessous simule celle de votre vêtement ; le marquage reste soumis à sa compatibilité.</p>
+      <p class="textile-notice"><strong>Textile non fourni.</strong> Vous fournissez votre t-shirt. Choisissez la référence de votre vêtement ; le marquage reste soumis à sa compatibilité.</p>
+      <div class="shirt-catalog">
+        <p class="eyebrow">SÉLECTION VICTOR &amp; YONEX 2026</p>
+        <label for="shirt-brand">Marque de votre textile</label><select id="shirt-brand"><option>Yonex</option><option>Victor</option><option value="generic">Autre textile</option></select>
+        <label for="shirt-model">Modèle et coloris</label><select id="shirt-model"></select>
+        <p id="shirt-model-info" class="studio-note"></p><a id="shirt-model-source" target="_blank" rel="noopener noreferrer">Voir la fiche officielle ↗</a>
+        <p class="studio-note">Sélection de modèles 2026. Vous fournissez le vêtement sélectionné. Les motifs d’origine sont conservés ; seul le marquage est ajouté.</p>
+      </div>
       <label for="shirt-text">Prénom, nom ou surnom</label><input id="shirt-text" maxlength="28" value="CAMILLE" placeholder="Votre signature" autocomplete="off">
-      <fieldset class="swatch-field"><legend>Couleur de votre t-shirt</legend><div class="studio-swatches" id="shirt-colors"></div></fieldset>
+      <fieldset id="shirt-generic-colors" class="swatch-field"><legend>Couleur de votre t-shirt</legend><div class="studio-swatches" id="shirt-colors"></div></fieldset>
       <fieldset class="swatch-field"><legend>Couleur du texte</legend><div class="studio-swatches" id="shirt-ink-colors"></div></fieldset>
       <label for="shirt-font">Typographie</label><select id="shirt-font"><option value="sport">Sport</option><option value="classic">Classique</option><option value="script">Manuscrite</option></select>
       <label for="shirt-placement">Placement du texte</label><select id="shirt-placement"><option value="upper">Haut du dos</option><option value="center">Centre du dos</option></select>

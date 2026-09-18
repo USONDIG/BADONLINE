@@ -17,7 +17,14 @@ def website_assets():
         body = body.replace('/assets/' + image.name, uri)
     css = (PUBLIC / 'style.css').read_text(encoding='utf-8') + '\n' + (PUBLIC / 'studio.css').read_text(encoding='utf-8')
     css += '\n[data-testid="stHeader"]{display:none}[data-testid="stMainBlockContainer"]{padding:0;max-width:none}[data-testid="stMain"]{background:#e8ece9}[data-testid="stVerticalBlock"]{gap:0}'
-    shared = (PUBLIC / 'studio.js').read_text(encoding='utf-8') + '\n' + (PUBLIC / 'app.js').read_text(encoding='utf-8').split('// STREAMLIT_SPLIT')[0]
+    catalog = (PUBLIC / 'shirt-catalog.js').read_text(encoding='utf-8')
+    for image in (PUBLIC / 'assets' / 'shirts').iterdir():
+        if image.suffix not in ('.webp', '.jpg'):
+            continue
+        mime = 'image/webp' if image.suffix == '.webp' else 'image/jpeg'
+        uri = 'data:' + mime + ';base64,' + base64.b64encode(image.read_bytes()).decode()
+        catalog = catalog.replace('/assets/shirts/' + image.name, uri)
+    shared = catalog + '\n' + (PUBLIC / 'studio.js').read_text(encoding='utf-8') + '\n' + (PUBLIC / 'app.js').read_text(encoding='utf-8').split('// STREAMLIT_SPLIT')[0]
     js = shared + '''\nexport default function(component) {
       const {parentElement, setTriggerValue, data} = component;
       return mountBadonline(parentElement, payload => {setTriggerValue('submission',payload);return null;},data?.result);

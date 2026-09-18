@@ -76,6 +76,21 @@ class ContactTest(unittest.TestCase):
             self.assertEqual(raised.exception.code, code)
             self.assertNotIn('private', str(raised.exception))
 
+    def test_official_catalog_assets_are_embedded(self):
+        from pathlib import Path
+        catalog = (Path(__file__).parents[1] / 'public/shirt-catalog.js').read_text()
+        models = json.loads(catalog.split('const BADONLINE_SHIRTS = ', 1)[1].rstrip(';\n'))
+        self.assertEqual(len(models), 4)
+        self.assertEqual({m['brand'] for m in models}, {'Yonex', 'Victor'})
+        for model in models:
+            for view in ('front', 'back'):
+                self.assertTrue((Path(__file__).parents[1] / 'public' / model[view].lstrip('/')).is_file())
+        html, css, js = website_assets()
+        self.assertNotIn('/assets/shirts/', js)
+        self.assertIn('data:image/webp;base64,', js)
+        self.assertIn('data:image/jpeg;base64,', js)
+        self.assertIn('shirt-model', html)
+
     def test_limit(self):
         limiter=RateLimiter()
         for _ in range(30):self.assertTrue(limiter.allow())
