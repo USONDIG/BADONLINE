@@ -4,11 +4,14 @@ import base64
 import re
 import os
 import time
+import streamlit as st
 from contact_mail import send_request, RateLimiter, DeliveryError
 
 PUBLIC = Path(__file__).parent / 'public'
 
 
+# Assets stay static during execution; restart the app after changing them.
+@st.cache_data(show_spinner=False)
 def website_assets():
     source = (PUBLIC / 'index.html').read_text(encoding='utf-8')
     body = re.search(r'<body>(.*)</body>', source, re.S).group(1)
@@ -33,7 +36,6 @@ def website_assets():
 
 
 def main():
-    import streamlit as st
     st.set_page_config(page_title='BADONLINE — Votre style. Vos couleurs. Votre jeu.',page_icon='🏸',layout='wide')
     html, css, js = website_assets()
 
