@@ -76,7 +76,7 @@ class ContactTest(unittest.TestCase):
             self.assertEqual(raised.exception.code, code)
             self.assertNotIn('private', str(raised.exception))
 
-    def test_official_catalog_assets_are_embedded(self):
+    def test_official_catalog_assets_are_served_statically(self):
         from pathlib import Path
         catalog = (Path(__file__).parents[1] / 'public/shirt-catalog.js').read_text()
         models = json.loads(catalog.split('const BADONLINE_SHIRTS = ', 1)[1].rstrip(';\n'))
@@ -87,8 +87,20 @@ class ContactTest(unittest.TestCase):
                 self.assertTrue((Path(__file__).parents[1] / 'public' / model[view].lstrip('/')).is_file())
         html, css, js = website_assets()
         self.assertNotIn('/assets/shirts/', js)
-        self.assertIn('data:image/webp;base64,', js)
-        self.assertIn('data:image/jpeg;base64,', js)
+        self.assertNotIn('data:image/webp;base64,', js)
+        self.assertNotIn('data:image/jpeg;base64,', js)
+        import hashlib
+        root = Path(__file__).parents[1]
+        for model in models:
+            for view in ('front', 'back'):
+                original = root / 'public' / model[view].lstrip('/')
+                static = root / 'static/shirts' / original.name
+                self.assertEqual(static.read_bytes(), original.read_bytes())
+                version = hashlib.sha256(static.read_bytes()).hexdigest()[:12]
+                self.assertIn('app/static/shirts/' + original.name + '?v=' + version, js)
+        import tomllib
+        config = tomllib.loads((root / '.streamlit/config.toml').read_text())
+        self.assertTrue(config['server']['enableStaticServing'])
         self.assertIn('shirt-model', html)
 
     def test_limit(self):
