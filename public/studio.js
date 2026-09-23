@@ -162,7 +162,27 @@ function mountStudio(root, listen) {
     state.tab=tab;root.querySelectorAll('[data-studio-tab]').forEach(b=>{const active=b.dataset.studioTab===tab;b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});
     $('#panel-shirt').hidden=tab!=='shirt';$('#panel-tube').hidden=tab!=='tube';render();
   }
-  function render(){syncShirt();syncCatalog();const fitted=drawShirt(shirtCanvas);$('#shirt-fit-note').textContent=fitted?'Le texte a été réduit pour rester dans la zone de marquage.':(selectedModel()?'Photographie du modèle officiel. Placement indicatif à valider avant marquage.':'La couleur du vêtement est une simulation de votre textile.');drawTube();refreshSwatches('#tube-colors',state.tube.color);syncControls();}
+  let renderFrame=null;
+  function paintPreview(){
+    const fitted=drawShirt(shirtCanvas);
+    $('#shirt-fit-note').textContent=fitted?'Le texte a été réduit pour rester dans la zone de marquage.':(selectedModel()?'Photographie du modèle officiel. Placement indicatif à valider avant marquage.':'La couleur du vêtement est une simulation de votre textile.');
+    drawTube();
+  }
+  function render(){
+    // Keep constraints and controls synchronous; only coalesce Canvas painting.
+    state.tube.layers.forEach(keepInside);
+    syncShirt();syncCatalog();refreshSwatches('#tube-colors',state.tube.color);syncControls();
+    if(renderFrame!==null)return;
+    renderFrame=requestAnimationFrame(()=>{
+      renderFrame=null;
+      if(root.isConnected!==false)paintPreview();
+    });
+  }
+  function flushPreview(){
+    // An explicit export must include changes made before the next frame.
+    if(renderFrame===null)return;
+    cancelAnimationFrame(renderFrame);renderFrame=null;paintPreview();
+  }
   function jpeg(canvas){const value=canvas.toDataURL('image/jpeg',.85);if(value.length>1400000)throw new Error('Image trop volumineuse');return value;}
   function shirtSheet(){
     if(!photosReady())throw new Error('Attendez le chargement des photos du textile.');
@@ -173,6 +193,7 @@ function mountStudio(root, listen) {
     c.font='18px Arial';c.fillText('BADONLINE · Simulation indicative · Textile non fourni, apporté par le client',600,654);return out;
   }
   function tubeSheet(){
+    flushPreview();
     const out=document.createElement('canvas');out.width=1050;out.height=950;const c=out.getContext('2d');c.fillStyle='#e8ece9';c.fillRect(0,0,1050,950);c.drawImage(flat,40,25,600,850);c.drawImage(tubeCanvas,685,25,330,850);c.font='20px Arial';c.fillStyle='#22362b';c.textAlign='center';c.fillText('BADONLINE · Simulation indicative — maquette finale à valider',525,920);return out;
   }
   function summary(kind){
@@ -194,7 +215,7 @@ function mountStudio(root, listen) {
     }
   }
   function addCreation(kind){
-    render();
+    render();flushPreview();
     if(kind==='shirt'&&!state.shirt.front.text.trim()&&!state.shirt.back.text.trim()){notice('Ajoutez un texte sur la face ou le dos du t-shirt.');return;}
     if(kind==='tube'&&state.tube.layers.every(l=>l.type==='text'&&!l.text.trim())){notice('Ajoutez du texte ou une photo à votre tube.');return;}
     try{
